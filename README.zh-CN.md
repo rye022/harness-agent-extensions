@@ -82,7 +82,7 @@ dsh plugin --profile desktop remove @harness-ext/time-machine @harness-ext/conte
 | 预算用的是实测窗口 | `decisions.jsonl` 324 行，每行都记录来自 `contextPressure` 的 `windowTokens: 1048576` |
 | 模型看得到工具，但不需要调用 | 请求头里共 49 个工具，包含全部五个 `tm_*` 与五个 `co_*` |
 
-想在自己的机器上核对：
+想在自己的机器上核对（`$DSH_HOME` 默认是 `~/.dsh`，Windows 上是 `%USERPROFILE%\.dsh`）：
 
 ```bash
 wc -l "$DSH_HOME/time-machine/checkpoints.jsonl"          # 自动检查点条数

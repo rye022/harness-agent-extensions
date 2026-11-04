@@ -112,7 +112,8 @@ below was triggered by calling a `tm_*` or `co_*` tool.
 | The budget is measured, not assumed | 324 decision lines in `decisions.jsonl`, every one recording `windowTokens: 1048576` taken from `contextPressure` |
 | The model sees the plugins as tools but does not need them | the request header listed 49 tools, including all five `tm_*` and five `co_*` |
 
-To check the same things on your machine:
+To check the same things on your machine (`$DSH_HOME` defaults to `~/.dsh`, or
+`%USERPROFILE%\.dsh` on Windows):
 
 ```bash
 wc -l "$DSH_HOME/time-machine/checkpoints.jsonl"          # auto-turn records
