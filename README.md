@@ -143,7 +143,7 @@ pnpm typecheck
 
 `pnpm test` runs every `packages/*/test/**/*.test.ts` file with `node --test`. It
 executes the TypeScript sources directly, so use Node 24 for the test suite. At the
-time of writing the suite contains 73 tests and all of them pass. `pnpm build` writes
+time of writing the suite contains 76 tests and all of them pass. `pnpm build` writes
 `lib/` for each package with `tsc -b`; `pnpm typecheck` runs the same project build
 with verbose output. Use `pnpm clean` to remove the build output.
 
@@ -375,7 +375,7 @@ Run the test suite from the repository root:
 pnpm test
 ```
 
-The runner is `node --test`. The current suite has 73 tests:
+The runner is `node --test`. The current suite has 76 tests:
 
 | Area | File | Tests | Coverage |
 | --- | --- | --- | --- |
@@ -384,7 +384,7 @@ The runner is `node --test`. The current suite has 73 tests:
 | Time Machine plugin | `packages/time-machine/test/plugin.test.ts` | 4 | mount, capture at turn end, `tm_restore`, conflict refusal, `ctx.effect` disposal, with a fake Cordis context |
 | Time Machine Cordis | `packages/time-machine/test/cordis.test.ts` | 4 | mount under real Cordis 4.0.5, `fs/write-intent` capture, tool round-trip, disposal |
 | Context OS store | `packages/context-os/test/store.test.ts` | 11 | remember/stats, dedupe, Chinese FTS recall, scope isolation, expiry, stale marking, forget, prune, malformed MATCH fallback, v0 migration, newer-schema refusal |
-| Context OS core | `packages/context-os/test/core.test.ts` | 11 | budget profiles, threshold, retain floor, 80-token refusal, overrides, live request preference, section ordering, truncation, ingest mapping, ignored events |
+| Context OS core | `packages/context-os/test/core.test.ts` | 11 | budget profiles, threshold, reserve capped at half the free space, 80-token refusal, overrides, live request preference, section ordering, truncation, ingest mapping, ignored events |
 | Context OS plugin | `packages/context-os/test/plugin.test.ts` | 8 | service and tools, L1 capture, L2 goals, open errors, remember/recall round-trip, brief cap, disposal, bad config |
 | Compaction retention | `packages/context-os/test/compaction.test.ts` | 2 | request/goal/error/file survive a summary; recall still reaches the original request |
 | Two plugins together | `tests/interop.test.ts` | 3 | both bundles in one real Cordis context, disjoint tool names, checkpoint mirrored into memory, independent disposal |

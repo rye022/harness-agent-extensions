@@ -12,11 +12,16 @@
  * - `saver` — inject early (50%) with a small cap, so the model re-reads a
  *   short digest instead of carrying history.
  *
- * `minRetainTokens` is a floor on free space: the brief is never allowed to eat
- * into the room a turn needs to finish, which is the failure mode of naive
- * "compress to make room" loops.
+ * `retainTokens` is a floor on free space: the brief is not allowed to eat into
+ * the room a turn needs to finish, which is the failure mode of naive "compress
+ * to make room" loops. The floor is capped at half of the remaining room, so at
+ * high pressure a short brief can still fit instead of being locked out by a
+ * reserve that is larger than what is left.
  */
 import type { BudgetDecision, BudgetMode, ContextUsage } from './types.ts'
+
+/** Smallest brief worth contributing: below this it is noise, not memory. */
+const MIN_BRIEF_TOKENS = 80
 
 /** Per-mode defaults, as fractions of the context window. */
 export interface BudgetProfile {
@@ -91,25 +96,35 @@ export function decideBudget(usage: ContextUsage, options: BudgetOptions): Budge
       pressure,
     }
   }
-  const available = free - profile.retainTokens
-  if (available <= 0) {
+  /**
+   * The reserve is capped at half of the remaining room.
+   *
+   * Honouring a 10–20 % floor literally at high pressure makes the brief
+   * impossible exactly when it matters most: with 8 000 tokens free and a
+   * 20 000-token floor the old rule reported "nothing left" although a
+   * 900-token brief would have fit. Half the headroom is the most a
+   * contributor may take; the other half stays for the turn itself.
+   */
+  const reserve = Math.min(profile.retainTokens, Math.max(0, Math.floor(free / 2)))
+  const available = free - reserve
+  if (available < MIN_BRIEF_TOKENS) {
     return {
       mode: options.mode,
       injectBrief: false,
       briefTokens: 0,
       retainTokens: profile.retainTokens,
-      reason: `only ${String(Math.max(0, free))} tokens free and ${String(profile.retainTokens)} must be retained`,
+      reason: `no room for a brief: ${String(Math.max(0, free))} tokens free, ${String(reserve)} reserved, ${String(Math.max(0, available))} usable (< ${String(MIN_BRIEF_TOKENS)})`,
       pressure,
     }
   }
   const briefTokens = Math.min(profile.briefCapTokens, available)
-  if (briefTokens < 80) {
+  if (briefTokens < MIN_BRIEF_TOKENS) {
     return {
       mode: options.mode,
       injectBrief: false,
       briefTokens: 0,
       retainTokens: profile.retainTokens,
-      reason: `budget left for a brief is only ${String(briefTokens)} tokens (< 80)`,
+      reason: `budget left for a brief is only ${String(briefTokens)} tokens (< ${String(MIN_BRIEF_TOKENS)})`,
       pressure,
     }
   }

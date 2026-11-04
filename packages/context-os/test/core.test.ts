@@ -43,21 +43,23 @@ test('modes differ in how early they contribute', () => {
   assert.equal(decideBudget(u, { mode: 'saver', windowTokens }).injectBrief, true)
 })
 
-test('the retain floor wins over the brief cap', () => {
-  // 92% used: 8 000 free, balanced retains 20 000 → nothing left for a brief.
+test('the reserve is capped at half of the remaining room', () => {
+  // 92% used: 8 000 free, balanced's 20 000 floor would eat all of it. The cap
+  // keeps half free (4 000), so the 900-token brief still fits.
   const decision = decideBudget(usage(92_000), { mode: 'balanced', windowTokens })
-  assert.equal(decision.injectBrief, false)
-  assert.match(decision.reason, /must be retained/)
+  assert.equal(decision.injectBrief, true)
+  assert.equal(decision.briefTokens, 900)
 })
 
-test('a brief smaller than 80 tokens is refused', () => {
-  // 72% used → 28 000 free; retaining all but 50 of it leaves no usable brief.
-  const decision = decideBudget(usage(72_000), {
-    mode: 'balanced',
-    windowTokens,
-    briefCapTokens: 120,
-    retainTokens: 27_950,
-  })
+test('a context that is already over the window has no room for a brief', () => {
+  const decision = decideBudget(usage(104_000), { mode: 'balanced', windowTokens })
+  assert.equal(decision.injectBrief, false)
+  assert.match(decision.reason, /no room/)
+})
+
+test('a brief that cannot reach 80 tokens is refused', () => {
+  // 99.95% used → 50 tokens free, half of them reserved: no usable brief.
+  const decision = decideBudget(usage(99_950), { mode: 'balanced', windowTokens })
   assert.equal(decision.injectBrief, false)
   assert.match(decision.reason, /< 80/)
 })

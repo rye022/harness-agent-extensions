@@ -108,7 +108,7 @@ interface ToolActor {
 }
 
 /** The published plugin version, kept in sync with package.json by `pnpm run version`. */
-export const version = '0.1.1';
+export const version = '0.1.2';
 
 /** Apply the plugin. */
 export function apply(ctx: PluginContext, rawConfig?: unknown): void {

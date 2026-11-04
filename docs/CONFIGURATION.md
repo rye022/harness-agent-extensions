@@ -164,7 +164,7 @@ plugin, see [Removing a plugin](#removing-a-plugin).
 | `windowTokens` | integer | `131072` | Context window used to compute pressure and the profile fractions. Accepted range: `1000` to `100000000`. |
 | `threshold` | number | unset | Pressure fraction at which a brief becomes eligible. Accepted range: `0` to `1`. When set, overrides the mode's threshold. |
 | `briefCapTokens` | integer | unset | Absolute maximum brief size. Accepted range: `80` to `200000`. When set, overrides the mode's fraction of `windowTokens`; the effective cap still has a 120-token floor. |
-| `retainTokens` | integer | unset | Absolute number of tokens held back from the window. Accepted range: `0` to `1000000`. When set, overrides the mode's fraction. A brief is built only if free space after this reserve is at least 80 tokens. |
+| `retainTokens` | integer | unset | Absolute number of tokens held back from the window. Accepted range: `0` to `1000000`. When set, overrides the mode's fraction. The reserve is always capped at half of the remaining free space; a brief is built only if at least 80 tokens remain usable after it. |
 | `capture.userMessages` | boolean | `true` | Ingest user messages as L1 `user-request` records. |
 | `capture.toolErrors` | boolean | `true` | Ingest failed tool results as L1 `error` records. |
 | `capture.files` | boolean | `true` | Ingest file-touching tool calls as L1 `file` records. |
@@ -254,11 +254,18 @@ The decision is computed from the current token usage:
 ```text
 pressure = used / windowTokens
 if pressure < threshold: no brief
-available = windowTokens - used - retainTokens
-if available <= 0: no brief
+free = windowTokens - used
+reserve = min(retainTokens, floor(free / 2))     # the floor never exceeds half the room
+available = free - reserve
+if available < 80: no brief
 briefTokens = min(briefCapTokens, available)
-if briefTokens < 80: no brief
 ```
+
+The cap on the reserve is what makes the brief reachable at high pressure: with
+8 000 tokens free and a 20 000-token floor, the old rule reported "nothing left"
+while a 900-token brief would have fit. A brief never takes more than half the
+remaining headroom, and nothing is contributed once the window is exhausted
+(`free <= 0`, i.e. pressure ≥ 100 %).
 
 `used` is the token meter's `totalTokens` when the meter is available, otherwise an
 estimate. `co_status` reports the basis (`usage` or `estimated`). The 80-token

@@ -5,10 +5,9 @@
 #   powershell -ExecutionPolicy Bypass -File .\install.ps1 -Profile myprof
 #   powershell -ExecutionPolicy Bypass -File .\install.ps1 -Dsh "C:\path\to\dsh.cmd"
 #
-# Put this script in the same directory as the three release tarballs:
-#   harness-ext-shared-0.1.0.tgz
-#   harness-ext-time-machine-0.1.1.tgz
-#   harness-ext-context-os-0.1.1.tgz
+# Put this script in the same directory as the three release tarballs
+# (harness-ext-shared-*.tgz, harness-ext-time-machine-*.tgz,
+# harness-ext-context-os-*.tgz) — the newest match of each is used.
 #
 # The script copies the shared tarball into the profile, writes the pnpm override
 # that makes @harness-ext/shared resolvable, and adds both plugin tarballs.
@@ -60,12 +59,18 @@ $home_ = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $HOME '.dsh' }
 $profileDir = Join-Path (Join-Path $home_ 'profiles') $Profile
 Write-Host "profile: $profileDir"
 
-$shared = Join-Path $Source 'harness-ext-shared-0.1.0.tgz'
-$tm = Join-Path $Source 'harness-ext-time-machine-0.1.1.tgz'
-$co = Join-Path $Source 'harness-ext-context-os-0.1.1.tgz'
-foreach ($file in @($shared, $tm, $co)) {
-    if (-not (Test-Path $file)) { Fail "missing tarball: $file" }
+function Find-Tarball {
+    param([string]$Pattern)
+    $hit = Get-ChildItem -Path $Source -Filter $Pattern -File -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | Select-Object -First 1
+    if (-not $hit) { Fail "missing tarball matching $Pattern in $Source" }
+    return $hit.FullName
 }
+
+$shared = Find-Tarball 'harness-ext-shared-*.tgz'
+$tm = Find-Tarball 'harness-ext-time-machine-*.tgz'
+$co = Find-Tarball 'harness-ext-context-os-*.tgz'
+$sharedLeaf = Split-Path -Leaf $shared
 
 # Creating the profile is a side effect of any `dsh plugin --profile <name>` call.
 if (-not (Test-Path $profileDir)) {
@@ -74,12 +79,12 @@ if (-not (Test-Path $profileDir)) {
 }
 if (-not (Test-Path $profileDir)) { Fail "profile was not created: $profileDir" }
 
-Copy-Item $shared (Join-Path $profileDir 'harness-ext-shared-0.1.0.tgz') -Force
+Copy-Item $shared (Join-Path $profileDir $sharedLeaf) -Force
 $workspace = Join-Path $profileDir 'pnpm-workspace.yaml'
 if (-not (Test-Path $workspace)) { Fail "missing $workspace" }
 $yaml = Get-Content $workspace -Raw
 if ($yaml -notmatch '@harness-ext/shared') {
-    Add-Content -Path $workspace -Value "`noverrides:`n  '@harness-ext/shared': 'file:./harness-ext-shared-0.1.0.tgz'"
+    Add-Content -Path $workspace -Value "`noverrides:`n  '@harness-ext/shared': 'file:./$sharedLeaf'"
     Write-Host 'added the pnpm override for @harness-ext/shared'
 } else {
     Write-Host 'pnpm override already present'

@@ -42,7 +42,7 @@ export const name = 'harness-ext-context-os'
 /** Services this plugin needs before it loads. */
 export const inject = ['tools']
 /** Semantic version of the plugin implementation. */
-export const version = '0.1.1'
+export const version = '0.1.2'
 
 /** Minimal structural view of the Cordis context this plugin uses. */
 export interface PluginContext {

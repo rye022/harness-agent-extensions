@@ -268,10 +268,14 @@ how large it may be (`packages/context-os/src/core/budget.ts`):
 | balanced | 70 % | 0.9 % | 20 % |
 | saver | 50 % | 0.6 % | 15 % |
 
-A brief is refused when the free space after the retain floor is < 80 tokens.
-This is the mechanism against the classic failure mode of "compress until the
-turn breaks": the floor is not negotiable, and the decision always explains itself
-in `co_status` / `budget/decided`.
+The retain floor is capped at half of the remaining room
+(`reserve = min(retainTokens, floor(free / 2))`), so a brief that fits can still be
+contributed at high pressure instead of being locked out by a floor larger than
+`free`. A brief is refused when the usable space (`free - reserve`) is < 80 tokens,
+or when the window is already exhausted (pressure ≥ 100 %, `free ≤ 0`). This is the
+mechanism against the classic failure mode of "compress until the turn breaks": the
+brief never takes more than half the headroom, and the decision always explains
+itself in `co_status`, `budget/decided` and `$DSH_HOME/context-os/decisions.jsonl`.
 
 ### 5.4 Brief composition
 
@@ -349,7 +353,7 @@ needs no core change and no React build.
 ## 8. Verification
 
 Proven by the repository's own tests (`pnpm test`, Node 24 runs the TypeScript
-directly — **72 tests, all passing**):
+directly — **76 tests, all passing**):
 
 - 10 shared tests (diff engine, ignore policy, hash, tokens, JSONL, atomic write);
 - 9 Time Machine core tests (object store, index damage tolerance, capture,

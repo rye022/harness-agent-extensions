@@ -95,7 +95,7 @@ pnpm build
 pnpm typecheck
 ```
 
-`pnpm test` 通过 `node --test` 运行所有 `packages/*/test/**/*.test.ts` 文件。它直接执行 TypeScript 源码，因此测试套件请使用 Node 24。撰写本文时套件包含 73 个测试，全部通过。`pnpm build` 用 `tsc -b` 为每个包生成 `lib/`；`pnpm typecheck` 以详细输出运行同一套项目构建。使用 `pnpm clean` 删除构建产物。
+`pnpm test` 通过 `node --test` 运行所有 `packages/*/test/**/*.test.ts` 文件。它直接执行 TypeScript 源码，因此测试套件请使用 Node 24。撰写本文时套件包含 76 个测试，全部通过。`pnpm build` 用 `tsc -b` 为每个包生成 `lib/`；`pnpm typecheck` 以详细输出运行同一套项目构建。使用 `pnpm clean` 删除构建产物。
 
 ## 安装到 DeepSeek Harness profile
 
@@ -265,7 +265,7 @@ co_brief { "query": "HTTP client refactor", "max_tokens": 900 }
 pnpm test
 ```
 
-运行器是 `node --test`。当前套件共有 73 个测试：
+运行器是 `node --test`。当前套件共有 76 个测试：
 
 | 区域 | 文件 | 测试数 | 覆盖内容 |
 | --- | --- | --- | --- |
@@ -274,7 +274,7 @@ pnpm test
 | Time Machine 插件 | `packages/time-machine/test/plugin.test.ts` | 4 | 挂载、轮次结束时捕获、`tm_restore`、冲突拒绝、`ctx.effect` 清理，使用模拟 Cordis 上下文 |
 | Time Machine Cordis | `packages/time-machine/test/cordis.test.ts` | 4 | 在真实 Cordis 4.0.5 下挂载、`fs/write-intent` 捕获、工具往返、清理 |
 | Context OS 存储 | `packages/context-os/test/store.test.ts` | 11 | remember/stats、去重、中文 FTS 召回、作用域隔离、过期、stale 标记、forget、prune、非法 MATCH 回退、v0 迁移、新版本拒绝 |
-| Context OS 核心 | `packages/context-os/test/core.test.ts` | 11 | 预算 profile、阈值、retain 下限、80 token 拒绝、覆盖值、优先使用当前请求、分段顺序、截断、ingest 映射、忽略事件 |
+| Context OS 核心 | `packages/context-os/test/core.test.ts` | 11 | 预算 profile、阈值、预留空间按剩余空间一半封顶、80 token 拒绝、覆盖值、优先使用当前请求、分段顺序、截断、ingest 映射、忽略事件 |
 | Context OS 插件 | `packages/context-os/test/plugin.test.ts` | 8 | 服务与工具、L1 捕获、L2 目标、未解决错误、remember/recall 往返、简报上限、清理、错误配置 |
 | 压缩保留 | `packages/context-os/test/compaction.test.ts` | 2 | 摘要替换后请求、目标、错误、文件仍在简报里；召回仍能命中原始请求 |
 | 双插件协同 | `tests/interop.test.ts` | 3 | 同一 Cordis 上下文挂载两个包、工具名不冲突、检查点镜像为记忆、可独立卸载 |
