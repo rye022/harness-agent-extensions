@@ -40,20 +40,58 @@ bundle 挂载之后，两个插件的主要工作都不需要模型调用工具�
   name: "@harness-ext/context-os"
   config:
     enabled: true
-    mode: conservative # 窗口用到 85% 时触发
-    windowTokens: 131072
+    mode: balanced # 窗口用到 70% 时触发
+    windowTokens: 131072 # 只是兜底；以宿主上报的窗口为准
     inject:
       enabled: true
       minSteps: 3 # 不碰一轮最开始的几步
 ```
 
-三种模式在安全性和 token 之间取舍：`conservative` 在窗口 85% 时触发，保留 25%，简报上限 1.2%；
-`balanced` 是 70% / 20% / 0.9%；`saver` 是 50% / 15% / 0.6%。保留下限始终优先，所以当剩余空间小于
-需要保留的预算时，任何模式都不会触发。移除 bundle 即可全部停止：
+三种模式的差别在“什么时候开始”和“能花多少”：第一个数是触发点，第二个是留给压缩的保留比例，
+第三个是简报上限（都是窗口的比例）：
+
+| 模式 | 触发点 | 保留比例 | 简报上限 | 召回条数 |
+| --- | --- | --- | --- | --- |
+| `conservative` | 85% | 10% | 1.2% | 4 |
+| `balanced` | 70% | 20% | 0.9% | 6 |
+| `saver` | 50% | 15% | 0.6% | 8 |
+
+保留比例在高压力下并不是照字面扣：`reserve = min(retainTokens, floor(free / 2))`，最多只拿走剩余空间
+的一半，另一半留给这一轮本身。简报还至少要有 80 个可用 token。效果是：**只要放得下就会注入**，
+90% 压力时也一样；而已经超出窗口的上下文则无空间可给，决策行会写
+`no room for a brief: 0 tokens free, 0 reserved, 0 usable (< 80)`。移除 bundle 即可全部停止：
 
 ```bash
 dsh plugin --profile desktop remove @harness-ext/time-machine @harness-ext/context-os
 ```
+
+预算以宿主实际上报的窗口为准（`contextPressure.contextWindow`），而不是配置里的 `windowTokens` 默认值——
+默认值过期会让所有压力判断都失真。每次决策都会追加到 `$DSH_HOME/context-os/decisions.jsonl`，
+所以事后可以回答“为什么没有注入简报”。
+
+## 在真实 Harness 里的验证
+
+两个 bundle 装进 DeepSeek Harness desktop `0.2.1-rc.5` 的 profile，并在真实会话里跑过
+（`deepseek-flash`，1 048 576 token 窗口）。下面这些都不是靠调用 `tm_*` / `co_*` 工具触发的。
+
+| 观察到的行为 | 证据 |
+| --- | --- |
+| 写入在真正发生前就被捕获 | `$DSH_HOME/time-machine/objects/` 有 425 个按内容寻址的文件；探针编辑对应的对象名就是**修改前**字节的 SHA-256，且在工具返回前就已落盘 |
+| 轮次结束自动提交检查点 | `checkpoints.jsonl` 里 20 条 `auto-turn` 记录，跨多个会话，0 行损坏 |
+| 会话进行中自动入库记忆 | `context.db` 202 条（L1 172 / L2 25 / L3 5）；消息或文件被触碰后 1–2 秒内就能查到对应行 |
+| 预算用的是实测窗口 | `decisions.jsonl` 324 行，每行都记录来自 `contextPressure` 的 `windowTokens: 1048576` |
+| 模型看得到工具，但不需要调用 | 请求头里共 49 个工具，包含全部五个 `tm_*` 与五个 `co_*` |
+
+想在自己的机器上核对：
+
+```bash
+wc -l "$DSH_HOME/time-machine/checkpoints.jsonl"          # 自动检查点条数
+find "$DSH_HOME/time-machine/objects" -type f | wc -l     # 去重后的对象数
+node -e "const {DatabaseSync}=require('node:sqlite');const db=new DatabaseSync(process.env.DSH_HOME+'/context-os/context.db');console.log(db.prepare('select layer,count(*) c from memories group by layer').all())"
+tail -n 5 "$DSH_HOME/context-os/decisions.jsonl"           # 为什么注入 / 没注入
+```
+
+数量取决于使用情况，数据结构不会变。
 
 ## 换一台电脑还能用吗
 
@@ -340,6 +378,7 @@ harness-agent-extensions/
 │   ├── CONFIGURATION.md        # every configuration key for both plugins
 │   └── research/               # design notes and upstream API research (00-06)
 ├── ARCHITECTURE.md             # design rationale, limitations, verification matrix
+├── CHANGELOG.md                # release notes
 ├── CONTRIBUTING.md             # development and review workflow
 ├── README.md                   # this file
 ├── README.zh-CN.md             # Chinese translation of this file
@@ -355,6 +394,7 @@ harness-agent-extensions/
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)：设计理由、扩展点、数据模型、安全规则、限制以及验证矩阵。
 - [docs/CONFIGURATION.md](docs/CONFIGURATION.md)：所有配置键、预算模式、归一化规则和数据位置。
+- [CHANGELOG.md](CHANGELOG.md)：每个版本的改动与 release 附件链接。
 - [CONTRIBUTING.md](CONTRIBUTING.md)：环境搭建、约定、添加工具或测试，以及评审清单。
 - [README.zh-CN.md](README.zh-CN.md)：本 README 的中文翻译。
 - 设计笔记：[00-architecture-review.md](docs/research/00-architecture-review.md)、
@@ -367,6 +407,7 @@ harness-agent-extensions/
 
 ## 状态与许可
 
-V0.1.0。这些包尚未发布到 npm；请按上面的说明从 tarball 安装。宿主 API 已可用，但客户端面板仍在计划中。
+V0.1.2。这些包尚未发布到 npm；请按上面的说明从 tarball 或 release 附件安装。宿主 API 已在日常会话中可用，
+客户端面板仍在计划中。各版本改动见 [CHANGELOG.md](CHANGELOG.md)。
 
 MIT。见 [LICENSE](LICENSE)。欢迎贡献；请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。

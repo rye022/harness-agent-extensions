@@ -67,23 +67,61 @@ layer, so it replaces the bundle defaults:
   name: "@harness-ext/context-os"
   config:
     enabled: true
-    mode: conservative # triggers at 85 % of the window
-    windowTokens: 131072
+    mode: balanced # triggers at 70 % of the window
+    windowTokens: 131072 # fallback only; the reported window wins
     inject:
       enabled: true
       minSteps: 3 # never touch the first steps of a turn
 ```
 
-The modes trade safety for tokens: `conservative` triggers at 85 % of the window with
-a 25 % retain floor and a 1.2 % brief cap, `balanced` at 70 % / 20 % / 0.9 %, `saver`
-at 50 % / 15 % / 0.6 %. The retain floor always wins, so no mode fires when the free
-room is smaller than the budget it must keep. Removing a bundle stops all of it:
+The three modes differ in when they start and how much they may spend — first number
+is the trigger, then the reserve kept for compaction, then the brief cap (all
+fractions of the context window):
+
+| Mode | Trigger | Reserve floor | Brief cap | Recall hits |
+| --- | --- | --- | --- | --- |
+| `conservative` | 85 % | 10 % | 1.2 % | 4 |
+| `balanced` | 70 % | 20 % | 0.9 % | 6 |
+| `saver` | 50 % | 15 % | 0.6 % | 8 |
+
+The reserve is not spent literally at high pressure: `reserve = min(retainTokens,
+floor(free / 2))`, so at most half of the remaining room is taken and the other half
+stays for the turn itself. A brief also needs at least 80 usable tokens. The effect is
+that a brief is contributed **whenever one fits**, even at 90 % pressure, while a
+context that is already over its window has nothing to give — its decision line reads
+`no room for a brief: 0 tokens free, 0 reserved, 0 usable (< 80)`. Removing a bundle
+stops all of it:
 
 ```bash
 dsh plugin --profile desktop remove @harness-ext/time-machine @harness-ext/context-os
 ```
 
 The budget is measured against the window the harness actually reports (`contextPressure.contextWindow`), not the configured `windowTokens` default — a stale default makes every pressure decision wrong. Every decision is appended to `$DSH_HOME/context-os/decisions.jsonl`, so "why was no brief injected?" is answerable after the fact.
+
+## Verified in a running Harness
+
+Both bundles were installed into a DeepSeek Harness desktop `0.2.1-rc.5` profile and
+exercised against a real session (`deepseek-flash`, 1 048 576-token window). Nothing
+below was triggered by calling a `tm_*` or `co_*` tool.
+
+| Observed | Evidence |
+| --- | --- |
+| Writes are captured before they happen | `$DSH_HOME/time-machine/objects/` held 425 content-addressed files; the object for a probe edit is named by the SHA-256 of the *pre-edit* bytes and appeared before the tool returned |
+| Turn checkpoints are committed automatically | `checkpoints.jsonl` held 20 `auto-turn` records across several sessions, 0 damaged lines |
+| Memories are ingested as the session runs | `context.db` held 202 records (172 L1 / 25 L2 / 5 L3); rows for a message or a touched file appear within 1–2 s |
+| The budget is measured, not assumed | 324 decision lines in `decisions.jsonl`, every one recording `windowTokens: 1048576` taken from `contextPressure` |
+| The model sees the plugins as tools but does not need them | the request header listed 49 tools, including all five `tm_*` and five `co_*` |
+
+To check the same things on your machine:
+
+```bash
+wc -l "$DSH_HOME/time-machine/checkpoints.jsonl"          # auto-turn records
+find "$DSH_HOME/time-machine/objects" -type f | wc -l     # deduplicated blobs
+node -e "const {DatabaseSync}=require('node:sqlite');const db=new DatabaseSync(process.env.DSH_HOME+'/context-os/context.db');console.log(db.prepare('select layer,count(*) c from memories group by layer').all())"
+tail -n 5 "$DSH_HOME/context-os/decisions.jsonl"           # why a brief was or was not injected
+```
+
+The counts are usage-dependent; the shapes are not.
 
 ## Use it on another computer
 
@@ -476,6 +514,7 @@ harness-agent-extensions/
 │   ├── CONFIGURATION.md        # every configuration key for both plugins
 │   └── research/               # design notes and upstream API research (00-06)
 ├── ARCHITECTURE.md             # design rationale, limitations, verification matrix
+├── CHANGELOG.md                # release notes
 ├── CONTRIBUTING.md             # development and review workflow
 ├── README.md                   # this file
 ├── README.zh-CN.md             # Chinese translation of this file
@@ -493,6 +532,7 @@ harness-agent-extensions/
   models, safety rules, limitations, and the verification matrix.
 - [docs/CONFIGURATION.md](docs/CONFIGURATION.md): every configuration key, budget
   mode, normalisation rule, and data location.
+- [CHANGELOG.md](CHANGELOG.md): what changed in each release, with links to the assets.
 - [CONTRIBUTING.md](CONTRIBUTING.md): setup, conventions, adding a tool or test, and
   the review checklist.
 - [README.zh-CN.md](README.zh-CN.md): Chinese translation of this README.
@@ -506,8 +546,9 @@ harness-agent-extensions/
 
 ## Status and license
 
-V0.1.0. The packages are not published to npm; install them from tarballs as shown
-above. The host API is usable, but the client panel is still planned.
+V0.1.2. The packages are not published to npm; install them from tarballs or release
+assets as shown above. The host API is usable in day-to-day sessions; the client panel
+is still planned. Changes per release are in [CHANGELOG.md](CHANGELOG.md).
 
 MIT. See [LICENSE](LICENSE). Contributions are welcome; read
 [CONTRIBUTING.md](CONTRIBUTING.md) first.
