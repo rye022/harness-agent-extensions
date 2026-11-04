@@ -237,9 +237,11 @@ the brief:
 
 | Mode | Threshold | Brief cap | Retain floor | Brief recall limit |
 | --- | --- | --- | --- | --- |
-| `conservative` | `0.85` | `1.2%` of `windowTokens` | `25%` of `windowTokens` | 4 |
+| `conservative` | `0.85` | `1.2%` of `windowTokens` | `10%` of `windowTokens` | 4 |
 | `balanced` | `0.70` | `0.9%` of `windowTokens` | `20%` of `windowTokens` | 6 |
 | `saver` | `0.50` | `0.6%` of `windowTokens` | `15%` of `windowTokens` | 8 |
+
+The decision itself is measured against the **real** context window when the harness reports one (the `contextPressure` projection carries `contextWindow`); `windowTokens` is only a fallback for harnesses that report none. Every decision is appended to `<root>/decisions.jsonl` (see `audit` below), so "why was no brief injected?" is answerable after the fact.
 
 The fractions are converted with rounding and a floor: the brief cap is
 `max(120, round(fraction * windowTokens))`, and the retain floor is

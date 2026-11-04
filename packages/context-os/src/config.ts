@@ -62,6 +62,12 @@ export interface ContextOsConfig {
     /** Maximum characters of a body returned by `co_recall`. */
     maxChars: number
   }
+  audit: {
+    /** Append every budget decision to `<root>/decisions.jsonl`. */
+    enabled: boolean
+    /** Truncate the audit file once it grows past this many bytes. */
+    maxBytes: number
+  }
 }
 
 /** Defaults matching the documented "balanced" mode. */
@@ -73,6 +79,7 @@ export const DEFAULT_CONFIG: ContextOsConfig = {
   retention: { maxRecords: 20_000, l1TtlHours: 12, pruneOnTurnEnd: true, summaryTtlDays: 30 },
   inject: { enabled: false, minSteps: 3 },
   tools: { enabled: true, disabled: [], recallLimit: 8, maxChars: 600 },
+  audit: { enabled: true, maxBytes: 262_144 },
 }
 
 /** A problem found while normalising user input. */
@@ -117,6 +124,7 @@ export function normalizeConfig(raw: unknown): NormalizedConfig {
     retention: { ...DEFAULT_CONFIG.retention },
     inject: { ...DEFAULT_CONFIG.inject },
     tools: { ...DEFAULT_CONFIG.tools, disabled: [] },
+    audit: { ...DEFAULT_CONFIG.audit },
   }
   if (raw === null || raw === undefined) return { config, issues }
   if (typeof raw !== 'object' || Array.isArray(raw)) {
@@ -233,6 +241,15 @@ export function normalizeConfig(raw: unknown): NormalizedConfig {
     const maxChars = tools.maxChars
     if (typeof maxChars === 'number' && Number.isFinite(maxChars) && maxChars >= 80) config.tools.maxChars = Math.round(maxChars)
     else if (maxChars !== undefined) issues.push({ path: 'tools.maxChars', message: 'expected a number >= 80', value: maxChars })
+  }
+  const audit = asObject(input.audit, 'audit', issues)
+  if (audit !== undefined) {
+    const enabled = audit.enabled
+    if (typeof enabled === 'boolean') config.audit.enabled = enabled
+    else if (enabled !== undefined) issues.push({ path: 'audit.enabled', message: 'expected a boolean', value: enabled })
+    const maxBytes = audit.maxBytes
+    if (typeof maxBytes === 'number' && Number.isFinite(maxBytes) && maxBytes >= 4096) config.audit.maxBytes = Math.round(maxBytes)
+    else if (maxBytes !== undefined) issues.push({ path: 'audit.maxBytes', message: 'expected a number >= 4096', value: maxBytes })
   }
   return { config, issues }
 }

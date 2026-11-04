@@ -8,8 +8,8 @@
 #
 # Put this script in the same directory as the three release tarballs:
 #   harness-ext-shared-0.1.0.tgz
-#   harness-ext-time-machine-0.1.0.tgz
-#   harness-ext-context-os-0.1.0.tgz
+#   harness-ext-time-machine-0.1.1.tgz
+#   harness-ext-context-os-0.1.1.tgz
 #
 # The script copies the shared tarball into the profile, writes the pnpm override
 # that makes @harness-ext/shared resolvable, and adds both plugin tarballs.
@@ -48,7 +48,7 @@ DSH_HOME_DIR="${DSH_HOME:-$HOME/.dsh}"
 PROFILE_DIR="$DSH_HOME_DIR/profiles/$PROFILE"
 echo "profile: $PROFILE_DIR"
 
-for file in harness-ext-shared-0.1.0.tgz harness-ext-time-machine-0.1.0.tgz harness-ext-context-os-0.1.0.tgz; do
+for file in harness-ext-shared-0.1.0.tgz harness-ext-time-machine-0.1.1.tgz harness-ext-context-os-0.1.1.tgz; do
   [ -f "$SOURCE/$file" ] || fail "missing tarball: $SOURCE/$file"
 done
 
@@ -70,8 +70,8 @@ else
 fi
 
 "$DSH_BIN" plugin --profile "$PROFILE" add \
-  "$SOURCE/harness-ext-time-machine-0.1.0.tgz" \
-  "$SOURCE/harness-ext-context-os-0.1.0.tgz"
+  "$SOURCE/harness-ext-time-machine-0.1.1.tgz" \
+  "$SOURCE/harness-ext-context-os-0.1.1.tgz"
 
 cat <<EOF
 

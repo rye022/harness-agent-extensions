@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { apply } from '../src/plugin.ts'
+import { apply, version as contextOsVersion } from '../src/plugin.ts'
 import type { ContextOsService } from '../src/plugin.ts'
 
 interface FakeTool {
@@ -82,7 +82,7 @@ function mount(): ReturnType<typeof fakeContext> & { service: ContextOsService }
 
 test('mounting publishes the service and the five tools', () => {
   const { tools, service, infos, dispose } = mount()
-  assert.equal(service.version, '0.1.0')
+  assert.equal(service.version, contextOsVersion)
   assert.equal(service.enabled, true)
   for (const name of ['co_remember', 'co_recall', 'co_brief', 'co_status', 'co_forget']) {
     assert.ok(tools.has(name), `${name} must be registered`)

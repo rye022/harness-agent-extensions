@@ -264,7 +264,7 @@ how large it may be (`packages/context-os/src/core/budget.ts`):
 
 | mode | threshold | brief cap | retain floor |
 | --- | --- | --- | --- |
-| conservative | 85 % | 1.2 % of window | 25 % |
+| conservative | 85 % | 1.2 % of window | 10 % |
 | balanced | 70 % | 0.9 % | 20 % |
 | saver | 50 % | 0.6 % | 15 % |
 

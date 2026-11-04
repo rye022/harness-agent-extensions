@@ -29,8 +29,8 @@ YAML
 
 dsh plugin --profile $DSH_PROFILE add \
   "$DSH_HOME/pkgs/harness-ext-shared-0.1.0.tgz" \
-  "$DSH_HOME/pkgs/harness-ext-time-machine-0.1.0.tgz" \
-  "$DSH_HOME/pkgs/harness-ext-context-os-0.1.0.tgz"
+  "$DSH_HOME/pkgs/harness-ext-time-machine-0.1.1.tgz" \
+  "$DSH_HOME/pkgs/harness-ext-context-os-0.1.1.tgz"
 
 dsh --profile $DSH_PROFILE --dump-config | grep -A3 'harness-ext'
 ```

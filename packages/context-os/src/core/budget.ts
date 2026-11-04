@@ -32,7 +32,13 @@ export interface BudgetProfile {
 
 /** Profiles keyed by mode. Values are fractions of the window except recallLimit. */
 export const BUDGET_PROFILES: Record<BudgetMode, BudgetProfile> = {
-  conservative: { threshold: 0.85, briefCapTokens: 0.012, retainTokens: 0.25, recallLimit: 4 },
+  /**
+   * Conservative fires late (85 %), so its reserve has to be smaller than the
+   * 15 % that is still free at that point — otherwise the reserve check can
+   * never pass and the mode silently never contributes a brief. 10 % leaves a
+   * 5 % band (85–90 %) in which a brief is allowed.
+   */
+  conservative: { threshold: 0.85, briefCapTokens: 0.012, retainTokens: 0.1, recallLimit: 4 },
   balanced: { threshold: 0.7, briefCapTokens: 0.009, retainTokens: 0.2, recallLimit: 6 },
   saver: { threshold: 0.5, briefCapTokens: 0.006, retainTokens: 0.15, recallLimit: 8 },
 }
@@ -61,8 +67,16 @@ export function resolveProfile(options: BudgetOptions): { threshold: number; bri
 
 /** Decide whether this step gets a brief and how large it may be. */
 export function decideBudget(usage: ContextUsage, options: BudgetOptions): BudgetDecision {
-  const profile = resolveProfile(options)
-  const window = Math.max(1, Math.round(options.windowTokens))
+  /**
+   * The measured window wins over the configured one: config is a fallback for
+   * harnesses that do not report a window, and a stale default silently turns
+   * every pressure decision into nonsense (free tokens come out negative).
+   */
+  const effectiveWindow =
+    usage.windowTokens !== undefined && usage.windowTokens > 0 ? usage.windowTokens : options.windowTokens
+  const effectiveOptions: BudgetOptions = { ...options, windowTokens: effectiveWindow }
+  const profile = resolveProfile(effectiveOptions)
+  const window = Math.max(1, Math.round(effectiveWindow))
   const used = Math.max(0, Math.round(usage.totalTokens))
   const pressure = used / window
   const free = window - used

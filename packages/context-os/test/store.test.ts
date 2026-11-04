@@ -177,3 +177,23 @@ test('a database from a newer build is refused instead of being rewritten', () =
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('an unknown layer is rejected instead of being stored', () => {
+  const store = new ContextStore({ path: ':memory:' })
+  try {
+    assert.throws(
+      () =>
+        store.remember({
+          layer: 'session' as never,
+          kind: 'progress',
+          scope: { kind: 'workspace', id: 'ws_x' },
+          title: 'coding task failed',
+          body: 'a caller that confused layer with scope',
+        }),
+      /invalid memory layer "session"/,
+    )
+    assert.equal(store.stats().total, 0)
+  } finally {
+    store.close()
+  }
+})

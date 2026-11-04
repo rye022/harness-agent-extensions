@@ -148,3 +148,17 @@ test('ingest ignores events that carry no reusable knowledge', () => {
   assert.equal(ingestEvent({ type: 'step/start', seq: 5, data: { turn: 1, step: 1 } }, ctx).length, 0)
   assert.equal(ingestEvent({ type: 'user/message', seq: 6, data: 'x' }, ctx).length, 0)
 })
+
+test('a measured context window overrides the configured fallback', () => {
+  // 900 000 of 1 048 576 tokens is 85.8%: over the conservative 85% threshold.
+  // Against the configured 131 072-token fallback the same usage would look
+  // impossible (free < 0) and silently suppress every brief, which is exactly
+  // what happened on a 1 M-token route.
+  const usage = { totalTokens: 900_000, basis: 'usage' as const, revision: 7, windowTokens: 1_048_576 }
+  const decision = decideBudget(usage, { mode: 'conservative', windowTokens: 131_072 })
+  assert.equal(decision.injectBrief, true)
+  assert.ok(decision.pressure > 0.85 && decision.pressure < 0.87, 'pressure is measured against the real window')
+
+  const fallback = decideBudget({ totalTokens: 900_000, basis: 'usage', revision: 7 }, { mode: 'conservative', windowTokens: 131_072 })
+  assert.equal(fallback.injectBrief, false, 'without a measured window the configured fallback still decides')
+})

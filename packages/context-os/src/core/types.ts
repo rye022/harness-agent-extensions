@@ -132,6 +132,13 @@ export interface ContextUsage {
   basis: 'usage' | 'estimated' | 'none'
   /** Session event revision the measurement describes. */
   revision: number
+  /**
+   * Context window the measurement belongs to, when the harness reports one.
+   * Prefer this over the configured fallback: a configuration default can be
+   * orders of magnitude off the real window (131 072 against a 1 048 576-token
+   * route, for example), which makes every pressure decision wrong.
+   */
+  windowTokens?: number
 }
 
 /** Budget policy names. */

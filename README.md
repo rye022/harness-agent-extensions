@@ -83,6 +83,8 @@ room is smaller than the budget it must keep. Removing a bundle stops all of it:
 dsh plugin --profile desktop remove @harness-ext/time-machine @harness-ext/context-os
 ```
 
+The budget is measured against the window the harness actually reports (`contextPressure.contextWindow`), not the configured `windowTokens` default — a stale default makes every pressure decision wrong. Every decision is appended to `$DSH_HOME/context-os/decisions.jsonl`, so "why was no brief injected?" is answerable after the fact.
+
 ## Use it on another computer
 
 Signing in to the same DeepSeek account on another machine does **not** carry the
@@ -176,7 +178,7 @@ pnpm --filter @harness-ext/context-os pack
 ```
 
 The shared tarball is named `harness-ext-shared-0.1.0.tgz`; the plugin tarballs are
-`harness-ext-time-machine-0.1.0.tgz` and `harness-ext-context-os-0.1.0.tgz`.
+`harness-ext-time-machine-0.1.1.tgz` and `harness-ext-context-os-0.1.1.tgz`.
 
 ### 2. Make the shared package resolvable
 
@@ -207,8 +209,8 @@ profile directory.
 ### 3. Add the plugins and restart
 
 ```bash
-dsh plugin --profile desktop add packages/time-machine/harness-ext-time-machine-0.1.0.tgz
-dsh plugin --profile desktop add packages/context-os/harness-ext-context-os-0.1.0.tgz
+dsh plugin --profile desktop add packages/time-machine/harness-ext-time-machine-0.1.1.tgz
+dsh plugin --profile desktop add packages/context-os/harness-ext-context-os-0.1.1.tgz
 ```
 
 If the tarballs were written somewhere else, pass their actual paths. Restart the

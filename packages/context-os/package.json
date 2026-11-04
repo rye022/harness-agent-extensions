@@ -1,6 +1,6 @@
 {
   "name": "@harness-ext/context-os",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Context OS for DeepSeek Harness: L1/L2/L3 memory layers, SQLite FTS5 recall, context-pressure monitoring and a cooperative (non-competing) compaction brief.",
   "license": "MIT",
   "type": "module",

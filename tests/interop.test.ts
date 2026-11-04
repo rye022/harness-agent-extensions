@@ -68,8 +68,8 @@ test('both plugins mount side by side with disjoint tool namespaces', () => {
     ['co_brief', 'co_forget', 'co_recall', 'co_remember', 'co_status'],
   )
   const services = ctx as unknown as { timeMachine?: { version: string }; contextOs?: { version: string } }
-  assert.equal(services.timeMachine?.version, '0.1.0')
-  assert.equal(services.contextOs?.version, '0.1.0')
+  assert.equal(services.timeMachine?.version, timeMachine.version)
+  assert.equal(services.contextOs?.version, contextOs.version)
 })
 
 test('a checkpoint surfaces as an L2 memory through the optional interop', async () => {

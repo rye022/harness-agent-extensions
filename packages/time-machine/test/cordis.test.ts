@@ -68,7 +68,7 @@ test('the plugin mounts under real Cordis and registers its tools', () => {
   assert.deepEqual([...tools.keys()].sort(), ['tm_checkpoint', 'tm_diff', 'tm_list', 'tm_restore', 'tm_status'])
   // Provided services become properties on the context.
   const service = (ctx as unknown as { timeMachine?: { version: string } }).timeMachine
-  assert.equal(service?.version, '0.1.0')
+  assert.equal(service?.version, timeMachine.version)
 })
 
 test('fs/write-intent captures a pre-image that a turn checkpoint keeps', async () => {

@@ -17,6 +17,8 @@
  *   plugin can break a turn. `co_brief` gives the same text on demand.
  */
 import { createHash } from 'node:crypto'
+import { appendFileSync, mkdirSync, statSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 import { TypedBus } from '@harness-ext/shared'
 
@@ -40,7 +42,7 @@ export const name = 'harness-ext-context-os'
 /** Services this plugin needs before it loads. */
 export const inject = ['tools']
 /** Semantic version of the plugin implementation. */
-export const version = '0.1.0'
+export const version = '0.1.1'
 
 /** Minimal structural view of the Cordis context this plugin uses. */
 export interface PluginContext {
@@ -143,8 +145,37 @@ export function apply(ctx: PluginContext, rawConfig?: unknown): void {
     return workspaceScopeOf(activeCwd(sessionId))
   }
 
-  const budgetOptions = (): BudgetOptions => ({
-    windowTokens: config.windowTokens,
+  /**
+   * Real context window for the session, when the harness exposes one. The
+   * `contextPressure` projection is the authoritative source: `tokenMeter`
+   * reports token totals but not the window they are measured against.
+   */
+  const readContextWindow = (sessionId?: string): number | undefined => {
+    const projections = ctx.get('sessionProjections') as
+      | undefined
+      | { stateOf(session: unknown, key: string): unknown }
+    if (projections === undefined) return undefined
+    const id = sessionId ?? lastSessionId
+    if (id === undefined) return undefined
+    const session = sessions.get(id)
+    if (session === undefined) return undefined
+    try {
+      const raw = projections.stateOf(session, 'contextPressure') as
+        | undefined
+        | { contextWindow?: unknown; val?: { contextWindow?: unknown } }
+      const value = raw?.val?.contextWindow ?? raw?.contextWindow
+      return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value) : undefined
+    } catch (error) {
+      ctx.logger.debug?.(`context-os: context window lookup failed: ${messageOf(error)}`)
+      return undefined
+    }
+  }
+
+  const effectiveWindow = (sessionId?: string): number =>
+    Math.max(1000, Math.round(readContextWindow(sessionId) ?? config.windowTokens))
+
+  const budgetOptions = (sessionId?: string): BudgetOptions => ({
+    windowTokens: effectiveWindow(sessionId),
     mode: config.mode,
     ...(config.threshold === undefined ? {} : { threshold: config.threshold }),
     ...(config.briefCapTokens === undefined ? {} : { briefCapTokens: config.briefCapTokens }),
@@ -168,6 +199,7 @@ export function apply(ctx: PluginContext, rawConfig?: unknown): void {
         totalTokens: Math.max(0, Math.round(measured.totalTokens ?? 0)),
         basis,
         revision: Math.max(0, Math.round(measured.logRevision ?? 0)),
+        windowTokens: effectiveWindow(id),
       }
     } catch (error) {
       ctx.logger.debug?.(`context-os: token measurement failed: ${messageOf(error)}`)
@@ -211,13 +243,13 @@ export function apply(ctx: PluginContext, rawConfig?: unknown): void {
   const buildBriefFor = (input: { query?: string; maxTokens?: number; sessionId?: string }): BuiltBrief => {
     if (store === null) return { text: '', tokens: 0, sections: [], recordIds: [], truncated: false }
     const decision = buildDecision(input.sessionId)
-    const cap = Math.max(120, input.maxTokens ?? decision?.briefTokens ?? resolveProfile(budgetOptions()).briefCapTokens)
+    const cap = Math.max(120, input.maxTokens ?? decision?.briefTokens ?? resolveProfile(budgetOptions(input.sessionId)).briefCapTokens)
     const sessionId = input.sessionId ?? lastSessionId
     const brief = buildBrief(store, {
       scope: [sessionScopeOf(sessionId), workspaceScopeOf(activeCwd(sessionId)), globalScope()],
       ...(input.query === undefined ? {} : { query: input.query }),
       maxTokens: cap,
-      recallLimit: resolveProfile(budgetOptions()).recallLimit,
+      recallLimit: resolveProfile(budgetOptions(input.sessionId)).recallLimit,
     })
     const recordIds = (brief as BuiltBrief).recordIds ?? []
     events.emit('brief/built', { tokens: brief.tokens, truncated: brief.truncated, records: recordIds.length })
@@ -227,7 +259,40 @@ export function apply(ctx: PluginContext, rawConfig?: unknown): void {
   const buildDecision = (sessionId?: string): BudgetDecision | null => {
     const usage = measureUsage(sessionId)
     if (usage === null) return null
-    return decideBudget(usage, budgetOptions())
+    return decideBudget(usage, budgetOptions(sessionId))
+  }
+
+  /**
+   * Append one decision record so "why did nothing get injected?" is answerable
+   * after the fact. It mirrors exactly what the plugin decided at that step,
+   * including the window it measured against and the reason string.
+   */
+  const auditDecision = (
+    sessionId: string | undefined,
+    decision: BudgetDecision | null,
+    extra: Record<string, unknown>,
+  ): void => {
+    if (!config.audit.enabled) return
+    try {
+      const dir = config.root ?? defaultRoot()
+      mkdirSync(dir, { recursive: true })
+      const file = join(dir, 'decisions.jsonl')
+      try {
+        if (statSync(file).size > config.audit.maxBytes) writeFileSync(file, '', 'utf8')
+      } catch {
+        // The file does not exist yet: appendFile creates it.
+      }
+      const line = JSON.stringify({
+        at: new Date().toISOString(),
+        sessionId: sessionId ?? null,
+        windowTokens: sessionId === undefined ? undefined : effectiveWindow(sessionId),
+        ...extra,
+        decision,
+      })
+      appendFileSync(file, `${line}\n`, 'utf8')
+    } catch (error) {
+      ctx.logger.debug?.(`context-os: decision audit failed: ${messageOf(error)}`)
+    }
   }
 
   const captureEnabled = (kind: MemoryKind): boolean => {
@@ -288,7 +353,7 @@ export function apply(ctx: PluginContext, rawConfig?: unknown): void {
     },
     status(sessionId) {
       const usage = measureUsage(sessionId)
-      const decision = usage === null ? null : decideBudget(usage, budgetOptions())
+      const decision = usage === null ? null : decideBudget(usage, budgetOptions(sessionId))
       const stats = store === null ? emptyStats(dbPath) : store.stats()
       const status: ContextOsStatus = {
         mode: config.mode,
@@ -313,7 +378,7 @@ export function apply(ctx: PluginContext, rawConfig?: unknown): void {
     decision(sessionId) {
       const usage = measureUsage(sessionId)
       if (usage === null) return null
-      const decision = decideBudget(usage, budgetOptions())
+      const decision = decideBudget(usage, budgetOptions(sessionId))
       events.emit('budget/decided', { decision })
       return decision
     },
@@ -463,6 +528,7 @@ export function apply(ctx: PluginContext, rawConfig?: unknown): void {
           const turnKey = `${sessionId}:${String(turn ?? 0)}`
           if (injectedTurns.has(turnKey)) return result
           const decision = buildDecision(sessionId)
+          auditDecision(sessionId, decision, { event: 'agent/pre-step', turn, step })
           if (decision === null || !decision.injectBrief) return result
           const brief = buildBriefFor({ maxTokens: decision.briefTokens, sessionId })
           if (brief.text === '') return result

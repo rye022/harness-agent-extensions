@@ -7,8 +7,8 @@
 #
 # Put this script in the same directory as the three release tarballs:
 #   harness-ext-shared-0.1.0.tgz
-#   harness-ext-time-machine-0.1.0.tgz
-#   harness-ext-context-os-0.1.0.tgz
+#   harness-ext-time-machine-0.1.1.tgz
+#   harness-ext-context-os-0.1.1.tgz
 #
 # The script copies the shared tarball into the profile, writes the pnpm override
 # that makes @harness-ext/shared resolvable, and adds both plugin tarballs.
@@ -61,8 +61,8 @@ $profileDir = Join-Path (Join-Path $home_ 'profiles') $Profile
 Write-Host "profile: $profileDir"
 
 $shared = Join-Path $Source 'harness-ext-shared-0.1.0.tgz'
-$tm = Join-Path $Source 'harness-ext-time-machine-0.1.0.tgz'
-$co = Join-Path $Source 'harness-ext-context-os-0.1.0.tgz'
+$tm = Join-Path $Source 'harness-ext-time-machine-0.1.1.tgz'
+$co = Join-Path $Source 'harness-ext-context-os-0.1.1.tgz'
 foreach ($file in @($shared, $tm, $co)) {
     if (-not (Test-Path $file)) { Fail "missing tarball: $file" }
 }

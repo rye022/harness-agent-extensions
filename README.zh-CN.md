@@ -122,7 +122,7 @@ pnpm --filter @harness-ext/time-machine pack
 pnpm --filter @harness-ext/context-os pack
 ```
 
-共享包的 tarball 名为 `harness-ext-shared-0.1.0.tgz`；两个插件包分别是 `harness-ext-time-machine-0.1.0.tgz` 和 `harness-ext-context-os-0.1.0.tgz`。
+共享包的 tarball 名为 `harness-ext-shared-0.1.0.tgz`；两个插件包分别是 `harness-ext-time-machine-0.1.1.tgz` 和 `harness-ext-context-os-0.1.1.tgz`。
 
 ### 2. 让共享包可以被解析
 
@@ -146,8 +146,8 @@ profile 中已经有 `packages:` 列表以及其他 pnpm 设置；请追加 `ove
 ### 3. 添加插件并重启
 
 ```bash
-dsh plugin --profile desktop add packages/time-machine/harness-ext-time-machine-0.1.0.tgz
-dsh plugin --profile desktop add packages/context-os/harness-ext-context-os-0.1.0.tgz
+dsh plugin --profile desktop add packages/time-machine/harness-ext-time-machine-0.1.1.tgz
+dsh plugin --profile desktop add packages/context-os/harness-ext-context-os-0.1.1.tgz
 ```
 
 如果 tarball 生成在别处，请传入实际路径。两条命令都执行完后重启 DeepSeek Harness desktop 应用；desktop profile 由 Electron 应用在启动时加载，新 bundle 需要重启后才能挂载。

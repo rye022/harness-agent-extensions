@@ -215,6 +215,14 @@ export class ContextStore {
 
   /** Insert or refresh a memory; returns the stored record. */
   remember(input: RememberInput): MemoryRecord {
+    /**
+     * Reject unknown layers instead of persisting them: a caller that confuses
+     * the layer with the scope (`'session'`, say) would otherwise write rows
+     * that no layer filter, brief or migration can ever see again.
+     */
+    if (input.layer !== 'L1' && input.layer !== 'L2' && input.layer !== 'L3') {
+      throw new Error(`invalid memory layer "${String(input.layer)}": expected L1, L2 or L3`)
+    }
     const now = this.now()
     const hash = memoryHash(input)
     const existing = this.db
