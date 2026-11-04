@@ -1,0 +1,115 @@
+/**
+ * Dynamic token budget.
+ *
+ * The three modes trade context fidelity against cost. They are *policies for
+ * contributing a brief*, never for compacting: Context OS does not own the
+ * compaction loop (billion-context/compaction-basic do), it only decides when
+ * the extra memory text is worth its tokens.
+ *
+ * - `conservative` — inject late (85% of the window) with a generous cap, so a
+ *   running task is left alone until it is genuinely under pressure.
+ * - `balanced` — inject from 70%.
+ * - `saver` — inject early (50%) with a small cap, so the model re-reads a
+ *   short digest instead of carrying history.
+ *
+ * `minRetainTokens` is a floor on free space: the brief is never allowed to eat
+ * into the room a turn needs to finish, which is the failure mode of naive
+ * "compress to make room" loops.
+ */
+import type { BudgetDecision, BudgetMode, ContextUsage } from './types.ts'
+
+/** Per-mode defaults, as fractions of the context window. */
+export interface BudgetProfile {
+  /** Pressure at which the brief starts being contributed. */
+  threshold: number
+  /** Maximum tokens the brief may occupy. */
+  briefCapTokens: number
+  /** Tokens that must stay free for the turn itself. */
+  retainTokens: number
+  /** Extra memories to pull in, used as the "aggressiveness" knob. */
+  recallLimit: number
+}
+
+/** Profiles keyed by mode. Values are fractions of the window except recallLimit. */
+export const BUDGET_PROFILES: Record<BudgetMode, BudgetProfile> = {
+  conservative: { threshold: 0.85, briefCapTokens: 0.012, retainTokens: 0.25, recallLimit: 4 },
+  balanced: { threshold: 0.7, briefCapTokens: 0.009, retainTokens: 0.2, recallLimit: 6 },
+  saver: { threshold: 0.5, briefCapTokens: 0.006, retainTokens: 0.15, recallLimit: 8 },
+}
+
+export interface BudgetOptions {
+  /** Effective context window for the current route, in tokens. */
+  windowTokens: number
+  mode: BudgetMode
+  /** Replace the profile's threshold (0..1). */
+  threshold?: number
+  /** Replace the profile's brief cap, in tokens. */
+  briefCapTokens?: number
+  /** Replace the profile's retain floor, in tokens (not a fraction). */
+  retainTokens?: number
+}
+
+/** Resolve a profile into absolute token numbers. */
+export function resolveProfile(options: BudgetOptions): { threshold: number; briefCapTokens: number; retainTokens: number; recallLimit: number } {
+  const base = BUDGET_PROFILES[options.mode]
+  const window = Math.max(1, Math.round(options.windowTokens))
+  const threshold = clamp01(options.threshold ?? base.threshold)
+  const briefCapTokens = Math.max(120, Math.round(options.briefCapTokens ?? base.briefCapTokens * window))
+  const retainTokens = Math.max(0, Math.round(options.retainTokens ?? base.retainTokens * window))
+  return { threshold, briefCapTokens, retainTokens, recallLimit: base.recallLimit }
+}
+
+/** Decide whether this step gets a brief and how large it may be. */
+export function decideBudget(usage: ContextUsage, options: BudgetOptions): BudgetDecision {
+  const profile = resolveProfile(options)
+  const window = Math.max(1, Math.round(options.windowTokens))
+  const used = Math.max(0, Math.round(usage.totalTokens))
+  const pressure = used / window
+  const free = window - used
+
+  if (pressure < profile.threshold) {
+    return {
+      mode: options.mode,
+      injectBrief: false,
+      briefTokens: 0,
+      retainTokens: profile.retainTokens,
+      reason: `pressure ${(pressure * 100).toFixed(1)}% is below the ${options.mode} threshold ${(profile.threshold * 100).toFixed(0)}%`,
+      pressure,
+    }
+  }
+  const available = free - profile.retainTokens
+  if (available <= 0) {
+    return {
+      mode: options.mode,
+      injectBrief: false,
+      briefTokens: 0,
+      retainTokens: profile.retainTokens,
+      reason: `only ${String(Math.max(0, free))} tokens free and ${String(profile.retainTokens)} must be retained`,
+      pressure,
+    }
+  }
+  const briefTokens = Math.min(profile.briefCapTokens, available)
+  if (briefTokens < 80) {
+    return {
+      mode: options.mode,
+      injectBrief: false,
+      briefTokens: 0,
+      retainTokens: profile.retainTokens,
+      reason: `budget left for a brief is only ${String(briefTokens)} tokens (< 80)`,
+      pressure,
+    }
+  }
+  return {
+    mode: options.mode,
+    injectBrief: true,
+    briefTokens,
+    retainTokens: profile.retainTokens,
+    reason: `pressure ${(pressure * 100).toFixed(1)}% ≥ ${(profile.threshold * 100).toFixed(0)}% (${options.mode}), contributing up to ${String(briefTokens)} tokens`,
+    pressure,
+  }
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(1, value))
+}

@@ -1,0 +1,44 @@
+# ============================================================================
+# harness-ext-time-machine — bundle patch for DeepSeek Harness
+# ============================================================================
+#
+# This file is the mount declaration of the Time Machine plugin: the harness
+# loader stacks every installed bundle's patch to compose its config tree, and
+# this layer inserts one row.
+#
+#   - insert       adds plugin rows to the tree
+#   - id           the row identifier used when a later patch overrides it;
+#                  it must be globally unique (do not put a trailing comment on
+#                  that line — submission tooling greps it verbatim)
+#   - name         the module that is resolved, i.e. this package; its `main`
+#                  (lib/index.js) exports { apply, inject, name }
+#   - config       passed to `apply(ctx, config)`; every field is optional and
+#                  unknown fields only produce warnings, never a boot failure
+#
+# The `enabled: false` row below is the whole-file switch: set it to false to
+# keep the package installed but leave no hooks, no tools and no storage open.
+# ============================================================================
+
+- insert:
+    - id: harness-ext-time-machine
+      name: '@harness-ext/time-machine'
+      config:
+        enabled: true
+        # Data root. Omit to use <DSH_HOME>/time-machine.
+        # root: 'C:\Users\you\.dsh\time-machine'
+        maxFileBytes: 2097152
+        maxFiles: 5000
+        ignoreExtra: []
+        capture:
+          writeIntent: true
+          editIntent: true
+          # Hash the whole workspace at every turn start, so shell (pwsh) edits
+          # become undoable too. Costs one full scan per turn; off by default.
+          workspaceSnapshotOnTurnStart: false
+        keep:
+          maxCheckpoints: 2000
+        tools:
+          enabled: true
+          disabled: []
+          maxDiffChars: 20000
+          maxListItems: 50

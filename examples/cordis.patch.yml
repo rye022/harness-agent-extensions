@@ -1,0 +1,65 @@
+# ============================================================================
+# Both harness extensions in one profile patch
+# ============================================================================
+#
+# Copy this file to <profile>/cordis.patch.yml (or merge its rows into your
+# existing one) when you install the packages by hand. When you install them
+# through `dsh plugin --profile <p> add <tarball>`, the bundles already insert
+# these rows — do not add them twice, the `id` values must stay unique.
+#
+# Each `name` is resolved as a module: its `main` (lib/index.js) exports
+# { apply, inject, name }. Every `config:` field is optional; unknown fields and
+# out-of-range numbers become warnings, never a boot failure.
+# ============================================================================
+
+- insert:
+    - id: harness-ext-time-machine
+      name: '@harness-ext/time-machine'
+      config:
+        enabled: true
+        maxFileBytes: 2097152
+        maxFiles: 5000
+        ignoreExtra: []
+        capture:
+          writeIntent: true
+          editIntent: true
+          # Hash the whole workspace at every turn start so shell (pwsh) edits
+          # become undoable too. Costs one full scan per turn; off by default.
+          workspaceSnapshotOnTurnStart: false
+        keep:
+          maxCheckpoints: 2000
+        tools:
+          enabled: true
+          disabled: []
+          maxDiffChars: 20000
+          maxListItems: 50
+
+    - id: harness-ext-context-os
+      name: '@harness-ext/context-os'
+      config:
+        enabled: true
+        # conservative | balanced | saver
+        mode: balanced
+        # Set this to the window of the model you actually route to.
+        windowTokens: 131072
+        capture:
+          userMessages: true
+          toolErrors: true
+          files: true
+          compaction: true
+          goals: true
+        retention:
+          maxRecords: 20000
+          l1TtlHours: 12
+          pruneOnTurnEnd: true
+          summaryTtlDays: 30
+        inject:
+          # EXPERIMENTAL: append the brief to the pre-step message list.
+          # Leave off and use `co_brief` unless you verified a turn survives it.
+          enabled: false
+          minSteps: 3
+        tools:
+          enabled: true
+          disabled: []
+          recallLimit: 8
+          maxChars: 600

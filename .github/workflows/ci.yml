@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # The plugins target DeepSeek Harness 0.2.1-rc.5, which ships Node 24.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [24.x]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.28.5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: typecheck
+        run: pnpm typecheck
+
+      # Build first: tests/interop.test.ts and tests/tool-runtime.test.ts load the
+      # workspace packages, whose entry point is lib/index.js.
+      - name: build
+        run: pnpm build
+
+      - name: test
+        run: pnpm test
+
+      - name: package
+        run: |
+          pnpm pack
+          pnpm --dir packages/time-machine pack
+          pnpm --dir packages/context-os pack
+
+      - name: benchmarks
+        # Benchmarks assert on thresholds, so a regression fails the job. They are
+        # hardware-sensitive: the bounds are deliberately generous (10x to 100x the
+        # measured value on a laptop), not a performance competition.
+        run: pnpm bench
+        if: matrix.os == 'ubuntu-latest'

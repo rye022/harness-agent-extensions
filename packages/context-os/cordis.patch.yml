@@ -1,0 +1,40 @@
+# Context OS — layered memory + token budget for DeepSeek Harness.
+#
+# Inserted by the profile loader as one row. Everything below is optional: the
+# plugin runs with its built-in defaults when `config:` is omitted entirely, and
+# unknown keys are reported as warnings instead of failing the boot.
+#
+# What it does NOT do: it never starts a compaction loop. `compaction-basic`
+# (or `billion-context`, which replaces it) stays the only owner of compaction;
+# Context OS only contributes a bounded brief when the context is under pressure.
+- insert:
+    - id: harness-ext-context-os
+      name: '@harness-ext/context-os'
+      config:
+        enabled: true
+        # conservative | balanced | saver — see docs/CONFIGURATION.md
+        mode: balanced
+        # Effective context window used for pressure math. Set this to the
+        # window of the model you actually route to (131_072 for deepseek-flash).
+        windowTokens: 131072
+        capture:
+          userMessages: true
+          toolErrors: true
+          files: true
+          compaction: true
+          goals: true
+        retention:
+          maxRecords: 20000
+          l1TtlHours: 12
+          pruneOnTurnEnd: true
+          summaryTtlDays: 30
+        inject:
+          # EXPERIMENTAL: append the brief to the pre-step message list.
+          # Leave off and use `co_brief` unless you have verified a turn survives it.
+          enabled: false
+          minSteps: 3
+        tools:
+          enabled: true
+          disabled: []
+          recallLimit: 8
+          maxChars: 600

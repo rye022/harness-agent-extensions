@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Agent Time Machine",
+    "description": "Content-addressed file checkpoints linked to the edits and test runs that produced them, with per-turn diffs and conflict-aware safe restores."
+  }
+}
