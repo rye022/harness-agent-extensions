@@ -55,6 +55,28 @@ bundle 挂载之后，两个插件的主要工作都不需要模型调用工具�
 dsh plugin --profile desktop remove @harness-ext/time-machine @harness-ext/context-os
 ```
 
+## 换一台电脑还能用吗
+
+同一账号登录另一台电脑**不会**把插件带过去。账号只同步模型凭证；profile、bundle 和两个存储都只是 `$DSH_HOME`（`~/.dsh`）下的本地文件。新电脑上默认什么都没有。
+
+两种装法：
+
+1. **用 Release 附件。** 从最新 release 下载三个 tarball 加 `install.ps1` / `install.sh` 到同一个目录，运行安装脚本。它会复制 shared 包到 profile、写入 pnpm 需要的 `overrides:`，然后装上两个 bundle：
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\install.ps1 -Profile desktop
+   ```
+
+   ```bash
+   ./install.sh --profile desktop
+   ```
+
+2. **从源码。** 克隆仓库，`pnpm install`、`pnpm build`，三个包分别 `pnpm pack`，再按上面的 tarball 步骤安装。
+
+目标机器需要 DeepSeek Harness desktop `0.2.1-rc.5`：bundle patch 只声明与该版本兼容，其它构建可能不接受或忽略这些配置行。
+
+想连历史一起带走，可以复制 `$DSH_HOME/time-machine/`（检查点日志和对象存储）与 `$DSH_HOME/context-os/context.db`。先完全退出 DeepSeek Harness，并把 `context.db-wal`、`context.db-shm` 一起复制，否则最近的写入会留在旧机器上。
+
 ## 环境要求
 
 - DeepSeek Harness desktop `0.2.1-rc.5`。bundle patch 只声明与该版本兼容。
@@ -323,6 +345,8 @@ harness-agent-extensions/
 ├── README.zh-CN.md             # Chinese translation of this file
 ├── LICENSE                     # MIT
 ├── package.json                # pnpm workspace root and scripts
+├── install.ps1                 # Windows profile 安装脚本
+├── install.sh                  # macOS/Linux profile 安装脚本
 ├── pnpm-workspace.yaml
 └── tsconfig.base.json
 ```

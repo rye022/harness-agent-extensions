@@ -83,6 +83,40 @@ room is smaller than the budget it must keep. Removing a bundle stops all of it:
 dsh plugin --profile desktop remove @harness-ext/time-machine @harness-ext/context-os
 ```
 
+## Use it on another computer
+
+Signing in to the same DeepSeek account on another machine does **not** carry the
+plugins over. Only model credentials follow the account; profiles, bundles and both
+stores are plain files under `$DSH_HOME` (`~/.dsh`). A second machine starts without
+them.
+
+Two ways to set them up there:
+
+1. **Release assets.** Download the three tarballs plus `install.ps1` / `install.sh`
+   from the latest release into one folder and run the installer. It copies the
+   shared tarball into the profile, writes the `overrides:` entry pnpm needs, and adds
+   both bundles:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\install.ps1 -Profile desktop
+   ```
+
+   ```bash
+   ./install.sh --profile desktop
+   ```
+
+2. **From source.** Clone the repository, run `pnpm install`, `pnpm build`, `pnpm pack`
+   for the three packages, and follow the tarball steps above.
+
+The target machine needs DeepSeek Harness desktop `0.2.1-rc.5`: the bundle patches
+declare compatibility with that release only, and a different build may reject or
+ignore the rows.
+
+Optional: to keep the history, copy `$DSH_HOME/time-machine/` (checkpoint journal and
+object store) and `$DSH_HOME/context-os/context.db`. Quit DeepSeek Harness first and
+copy the `context.db-wal` / `context.db-shm` siblings along with the database,
+otherwise the most recent writes stay behind.
+
 ## Requirements
 
 - DeepSeek Harness desktop `0.2.1-rc.5`. The bundle patches declare compatibility
@@ -445,6 +479,8 @@ harness-agent-extensions/
 ├── README.zh-CN.md             # Chinese translation of this file
 ├── LICENSE                     # MIT
 ├── package.json                # pnpm workspace root and scripts
+├── install.ps1                 # installer for a DSH profile (Windows)
+├── install.sh                  # installer for a DSH profile (macOS/Linux)
 ├── pnpm-workspace.yaml
 └── tsconfig.base.json
 ```
